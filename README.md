@@ -1,12 +1,12 @@
 <div align="center">
 
-# New Delta Attention (NDA)
+# Asymmetric Delta Attention (ADA)
 
 </div>
 
-This repository is a fork of `fla-org/flash-linear-attention` that adds support for **New Delta Attention (NDA)**, a generalisation of [Kimi Delta Attention (KDA)](https://arxiv.org/abs/2510.26692).
+This repository is a fork of `fla-org/flash-linear-attention` that adds support for **Asymmetric Delta Attention (ADA)**, a generalisation of [Kimi Delta Attention (KDA)](https://arxiv.org/abs/2510.26692).
 
-NDA replaces the scalar write-strength 
+ADA replaces the scalar write-strength 
 
 $$\beta_t\in\mathbb{R}$$ 
 
@@ -14,13 +14,14 @@ to key-dimension vector
 
 $$\boldsymbol{\beta}_t\in\mathbb{R}^{d_k},$$
 
-where $d_k$ is the key dimension. Intuitively, KDA uses a single write strength per token per head, whilst NDA allows the model to control the write strength **independently for each key dimension**.
+where $d_k$ is the key dimension. Intuitively, KDA uses a single write strength per token per head, whilst ADA allows the model to control the write strength **independently for each key dimension**.
 
 ## Contributions
 The changes to the original `kda` implementationare all in three places:
-- `fla/ops/nda/*.py` for NDA Triton kernels and naive implementations.
-- `fla/layers/nda.py` for NDA attention layer implementation that can be dropped in place of an existing attention layer.
-- `fla/models/nda/*.py` for NDA-based model implementations (this is exactly the KDA model with NDA attention layers instead of KDA).
+- `fla/ops/nda/*.py` for ADA Triton kernels and naive implementations.
+- `fla/layers/nda.py` for ADA attention layer implementation that can be dropped in place of an existing attention layer.
+- `fla/models/nda/*.py` for ADA-based model implementations (this is exactly the KDA model with ADA attention layers instead of KDA).
+(We previously called ADA "NDA", standing for New Delta Attention because we hadn't named it yet. This README has been updated, but the files haven't yet).
 
 ## Method
 The KDA recursion can be written as: 
@@ -33,9 +34,9 @@ where, at time step $t$,
 - $\boldsymbol{\alpha}_t\in\mathbb{R}^{d_k}$ is a vector that controls the decay rate for each dimension of the state matrix, and 
 - $\beta_t\in\mathbb{R}$ is a scalar that controls the write strength for the entire key vector.
 
-**NDA replaces the scalar $\beta_t$ with a vector $\boldsymbol{\beta}_t\in\mathbb{R}^{d_k}$**, giving 
+**ADA replaces the scalar $\beta_t$ with a vector $\boldsymbol{\beta}_t\in\mathbb{R}^{d_k}$**, giving 
 
-$$\mathbf{S}^\text{NDA}_t = \mathrm{Diag}(\boldsymbol{\alpha}_t)(\mathbf{I}-\mathrm{Diag}(\boldsymbol{\beta}_t)\mathbf{k}_t\mathbf{k}_t^\top)\mathbf{S}^\text{NDA}_{t-1}+\mathrm{Diag}(\boldsymbol{\beta}_t)\mathbf{k}_t\mathbf{v}_t.$$ 
+$$\mathbf{S}^\text{ADA}_t = \mathrm{Diag}(\boldsymbol{\alpha}_t)(\mathbf{I}-\mathrm{Diag}(\boldsymbol{\beta}_t)\mathbf{k}_t\mathbf{k}_t^\top)\mathbf{S}^\text{ADA}_{t-1}+\mathrm{Diag}(\boldsymbol{\beta}_t)\mathbf{k}_t\mathbf{v}_t.$$ 
 
 Equivalently, if we define a write-modulated key 
 
@@ -43,9 +44,9 @@ $$\tilde{\mathbf{k}}_t=\boldsymbol{\beta}_t\odot\mathbf{k}_t,$$
 
 where $\odot$ is the element-wise product, then the recurrence becomes 
 
-$$\mathbf{S}^\text{NDA}_t = \mathrm{Diag}(\boldsymbol{\alpha}_t)(\mathbf{I}-\tilde{\mathbf{k}}_t\mathbf{k}_t^\top)\mathbf{S}^\text{NDA}_{t-1}+\tilde{\mathbf{k}}_t\mathbf{v}_t.$$
+$$\mathbf{S}^\text{ADA}_t = \mathrm{Diag}(\boldsymbol{\alpha}_t)(\mathbf{I}-\tilde{\mathbf{k}}_t\mathbf{k}_t^\top)\mathbf{S}^\text{ADA}_{t-1}+\tilde{\mathbf{k}}_t\mathbf{v}_t.$$
 
-NDA can reduce to KDA if for all $t$, $\boldsymbol{\beta}_t=\beta_t\mathbf{1}$, where $\mathbf{1}\in\mathbb{R}^{d_k}$ is the all-one vector, hence the claim that NDA is a generalisation of KDA. In practice, we have found that NDA doesn't tend to learn a uniform write strength across key dimensions, which maybe suggests that the additional flexibility is indeed being utilised by the model, although on the other hand could also be a result of optimization difficulties in learning a (perhaps optimal) uniform write strength. 
+ADA can reduce to KDA if for all $t$, $\boldsymbol{\beta}_t=\beta_t\mathbf{1}$, where $\mathbf{1}\in\mathbb{R}^{d_k}$ is the all-one vector, hence the claim that ADA is a generalisation of KDA. In practice, we have found that ADA doesn't tend to learn a uniform write strength across key dimensions, which maybe suggests that the additional flexibility is indeed being utilised by the model, although on the other hand could also be a result of optimization difficulties in learning a (perhaps optimal) uniform write strength. 
 
 ## Acknowledgements
 This repository is built as a fork of `fla-org/flash-linear-attention`, and **heavily** reuses the KDA implementation and surrounding infrastructure. Thank you to the teams at **Bitdeer** and **Moonshot-AI** (and all contributors to `flash-linear-attention`) for their open-source contributions, which made this work possible.
@@ -71,7 +72,7 @@ This repo provides efficient implementations for emerging model architectures, w
   <img width="400" alt="Flash Linear Attention" src="https://github.com/fla-org/flash-linear-attention/assets/18402347/02ff2e26-1495-4088-b701-e72cd65ac6cf">
 </div>
 
-- [New Delta Attention (NDA)](#new-delta-attention-nda)
+- [Asymmetric Delta Attention (ADA)](#new-delta-attention-nda)
   - [Contributions](#contributions)
   - [Method](#method)
   - [Acknowledgements](#acknowledgements)
