@@ -1,7 +1,7 @@
 """
 This script checks if the chunked kernel behaves on your hardware.
-It should be ran before big training runs to identify any env issues
-- does chunk_ada match the recursion
+It should be run before big training runs to identify any env issues
+- does chunk_ada match the recurrence
 - does having vector beta be a multiple of the ones vector (so ~scalar beta)
   have the same as chunk_kda with actual scalar beta
 - does each config build and have expected param count and run
