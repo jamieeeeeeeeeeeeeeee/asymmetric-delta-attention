@@ -26,9 +26,9 @@ ADA started as a verbatim copy of the Preconditioned KDA (PKDA) files, and all c
 - `experiments/` for the scripts to train and test the language models (see [Language model experiments](#language-model-experiments)).
 
 ## Method
-The KDA recursion can be written as: 
+The KDA recurrence can be written as: 
 
-$$\mathbf{S}^\text{KDA}_t = \mathrm{Diag}(\boldsymbol{\alpha}_t)(\mathbf{I}-\beta_t\mathbf{k}_t\mathbf{k}_t^\top)\mathbf{S}^\text{KDA}_{t-1}+\mathbf{\beta}_t\mathbf{k}_t\mathbf{v}_t,$$ 
+$$\mathbf{S}^\text{KDA}_t = (\mathbf{I}-\beta_t\mathbf{k}_t\mathbf{k}_t^\top)\mathrm{Diag}(\boldsymbol{\alpha}_t)\mathbf{S}^\text{KDA}_{t-1}+\beta_t\mathbf{k}_t\mathbf{v}_t^\top,$$ 
 
 where, at time step $t$,
 - $\mathbf{S}^\text{KDA}_t\in\mathbb{R}^{d_k\times d_v}$ is the attention state matrix,
@@ -38,7 +38,7 @@ where, at time step $t$,
 
 **ADA replaces the scalar $\beta_t$ with a vector $\boldsymbol{\beta}_t\in\mathbb{R}^{d_k}$**, giving 
 
-$$\mathbf{S}^\text{ADA}_t = \mathrm{Diag}(\boldsymbol{\alpha}_t)(\mathbf{I}-\mathrm{Diag}(\boldsymbol{\beta}_t)\mathbf{k}_t\mathbf{k}_t^\top)\mathbf{S}^\text{ADA}_{t-1}+\mathrm{Diag}(\boldsymbol{\beta}_t)\mathbf{k}_t\mathbf{v}_t.$$ 
+$$\mathbf{S}^\text{ADA}_t = (\mathbf{I}-\mathrm{Diag}(\boldsymbol{\beta}_t)\mathbf{k}_t\mathbf{k}_t^\top)\mathrm{Diag}(\boldsymbol{\alpha}_t)\mathbf{S}^\text{ADA}_{t-1}+\mathrm{Diag}(\boldsymbol{\beta}_t)\mathbf{k}_t\mathbf{v}_t^\top.$$ 
 
 Equivalently, if we define a write-modulated key 
 
@@ -46,7 +46,7 @@ $$\tilde{\mathbf{k}}_t=\boldsymbol{\beta}_t\odot\mathbf{k}_t,$$
 
 where $\odot$ is the element-wise product, then the recurrence becomes 
 
-$$\mathbf{S}^\text{ADA}_t = \mathrm{Diag}(\boldsymbol{\alpha}_t)(\mathbf{I}-\tilde{\mathbf{k}}_t\mathbf{k}_t^\top)\mathbf{S}^\text{ADA}_{t-1}+\tilde{\mathbf{k}}_t\mathbf{v}_t.$$
+$$\mathbf{S}^\text{ADA}_t = (\mathbf{I}-\tilde{\mathbf{k}}_t\mathbf{k}_t^\top)\mathrm{Diag}(\boldsymbol{\alpha}_t)\mathbf{S}^\text{ADA}_{t-1}+\tilde{\mathbf{k}}_t\mathbf{v}_t^\top.$$
 
 ADA can reduce to KDA if for all $t$, $\boldsymbol{\beta}_t=\beta_t\mathbf{1}$, where $\mathbf{1}\in\mathbb{R}^{d_k}$ is the all-one vector, hence the claim that ADA is a generalisation of KDA. In practice, we have found that ADA doesn't tend to learn a uniform write strength across key dimensions, which maybe suggests that the additional flexibility is indeed being utilised by the model, although on the other hand could also be a result of optimization difficulties in learning a (perhaps optimal) uniform write strength. 
 
@@ -87,6 +87,7 @@ WANDB_PROJECT=ada-1b
 ```bash
 git clone https://github.com/jamieeeeeeeeeeeeeeee/asymmetric-delta-attention.git $REPO
 cd $REPO
+module load apps/binapps/anaconda3/2024.10
 python3.12 -m venv venv
 source venv/bin/activate
 pip install -r experiments/requirements-lock.txt
