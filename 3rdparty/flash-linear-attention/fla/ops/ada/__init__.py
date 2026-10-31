@@ -5,12 +5,10 @@
 # For a list of all contributors, visit:
 #   https://github.com/fla-org/flash-linear-attention/graphs/contributors
 
-from .chunk import chunk_precond_kda
-from .fused_recurrent import fused_recurrent_precond_kda
-from .naive import naive_recurrent_precond_kda
+from .chunk import chunk_ada
+from .naive import naive_recurrent_ada
 
 __all__ = [
-    "chunk_precond_kda",
-    "fused_recurrent_precond_kda",
-    "naive_recurrent_precond_kda",
+    "chunk_ada",
+    "naive_recurrent_ada",
 ]

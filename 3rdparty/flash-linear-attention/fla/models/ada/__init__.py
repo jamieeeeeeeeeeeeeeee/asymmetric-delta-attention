@@ -7,11 +7,11 @@
 
 from transformers import AutoConfig, AutoModel, AutoModelForCausalLM
 
-from fla.models.precond_kda.configuration_precond_kda import PrecondKDAConfig
-from fla.models.precond_kda.modeling_precond_kda import PrecondKDAForCausalLM, PrecondKDAModel
+from fla.models.ada.configuration_ada import ADAConfig
+from fla.models.ada.modeling_ada import ADAForCausalLM, ADAModel
 
-AutoConfig.register(PrecondKDAConfig.model_type, PrecondKDAConfig, exist_ok=True)
-AutoModel.register(PrecondKDAConfig, PrecondKDAModel, exist_ok=True)
-AutoModelForCausalLM.register(PrecondKDAConfig, PrecondKDAForCausalLM, exist_ok=True)
+AutoConfig.register(ADAConfig.model_type, ADAConfig, exist_ok=True)
+AutoModel.register(ADAConfig, ADAModel, exist_ok=True)
+AutoModelForCausalLM.register(ADAConfig, ADAForCausalLM, exist_ok=True)
 
-__all__ = ['PrecondKDAConfig', 'PrecondKDAForCausalLM', 'PrecondKDAModel']
+__all__ = ['ADAConfig', 'ADAForCausalLM', 'ADAModel']

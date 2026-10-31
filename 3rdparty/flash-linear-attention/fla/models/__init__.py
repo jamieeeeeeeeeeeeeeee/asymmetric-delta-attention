@@ -28,6 +28,7 @@ from fla.models.precond_gated_deltanet import (
     PrecondGatedDeltaNetForCausalLM,
     PrecondGatedDeltaNetModel,
 )
+from fla.models.ada import ADAConfig, ADAForCausalLM, ADAModel
 from fla.models.precond_kda import (
     PrecondKDAConfig,
     PrecondKDAForCausalLM,
@@ -122,6 +123,9 @@ __all__ = [
     'PrecondGatedDeltaNetConfig',
     'PrecondGatedDeltaNetForCausalLM',
     'PrecondGatedDeltaNetModel',
+    'ADAConfig',
+    'ADAForCausalLM',
+    'ADAModel',
     'PrecondKDAConfig',
     'PrecondKDAForCausalLM',
     'PrecondKDAModel',

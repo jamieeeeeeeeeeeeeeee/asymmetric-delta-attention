@@ -6,6 +6,7 @@
 #   https://github.com/fla-org/flash-linear-attention/graphs/contributors
 
 from .abc import ABCAttention
+from .ada import ADAttention
 from .attn import Attention
 from .based import BasedLinearAttention
 from .bitattn import BitAttention
@@ -40,6 +41,7 @@ from .rwkv7 import RWKV7Attention
 
 __all__ = [
     'ABCAttention',
+    'ADAttention',
     'Attention',
     'BasedLinearAttention',
     'BitAttention',

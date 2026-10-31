@@ -19,11 +19,11 @@ from transformers.utils import logging
 from transformers.utils.deprecation import deprecate_kwarg
 
 from fla.layers.attn import Attention
-from fla.layers.precond_kda import PrecondKDA
-from fla.models.precond_kda.configuration_precond_kda import PrecondKDAConfig
+from fla.layers.ada import ADAttention
+from fla.models.ada.configuration_ada import ADAConfig
 from fla.models.utils import Cache, FLAGenerationMixin
 from fla.modules import FusedCrossEntropyLoss, FusedLinearCrossEntropyLoss, RMSNorm
-from fla.modules import GatedMLP as PrecondKDAMLP
+from fla.modules import GatedMLP as ADAMLP
 from fla.modules.l2warp import l2_warp
 
 if TYPE_CHECKING:
@@ -38,8 +38,8 @@ except ImportError:
 logger = logging.get_logger(__name__)
 
 
-class PrecondKDABlock(GradientCheckpointingLayer):
-    def __init__(self, config: PrecondKDAConfig, layer_idx: int):
+class ADABlock(GradientCheckpointingLayer):
+    def __init__(self, config: ADAConfig, layer_idx: int):
         super().__init__()
 
         self.config = config
@@ -58,7 +58,7 @@ class PrecondKDABlock(GradientCheckpointingLayer):
                 layer_idx=layer_idx,
             )
         else:
-            self.attn = PrecondKDA(
+            self.attn = ADAttention(
                 mode=config.attn_mode,
                 hidden_size=config.hidden_size,
                 expand_v=config.expand_v,
@@ -70,14 +70,17 @@ class PrecondKDABlock(GradientCheckpointingLayer):
                 conv_size=config.conv_size,
                 norm_eps=config.norm_eps,
                 layer_idx=layer_idx,
-                squash_x=config.squash_x,
-                squash_eps=config.squash_eps,
-                log_atk_scale_init=config.log_atk_scale_init,
+                beta_rank=config.beta_rank,
+                use_decay_gate=config.use_decay_gate,
+                use_scalar_gate=config.use_scalar_gate,
+                use_output_gate=config.use_output_gate,
+                use_scalar_dt_bias=config.use_scalar_dt_bias,
+                dt_init=config.dt_init,
                 safe_gate=config.safe_gate,
                 lower_bound=config.lower_bound,
             )
         self.mlp_norm = (RMSNorm if config.fuse_norm else nn.RMSNorm)(config.hidden_size, eps=config.norm_eps)
-        self.mlp = PrecondKDAMLP(
+        self.mlp = ADAMLP(
             hidden_size=config.hidden_size,
             hidden_ratio=config.hidden_ratio,
             intermediate_size=config.intermediate_size,
@@ -118,11 +121,11 @@ class PrecondKDABlock(GradientCheckpointingLayer):
         return outputs
 
 
-class PrecondKDAPreTrainedModel(PreTrainedModel):
-    config_class = PrecondKDAConfig
+class ADAPreTrainedModel(PreTrainedModel):
+    config_class = ADAConfig
     base_model_prefix = "model"
     supports_gradient_checkpointing = True
-    _no_split_modules = ["PrecondKDABlock"]
+    _no_split_modules = ["ADABlock"]
     _supports_cache_class = True
 
     def __init__(self, *inputs, **kwargs):
@@ -134,35 +137,26 @@ class PrecondKDAPreTrainedModel(PreTrainedModel):
         prenorm_residual_strategy: str | None = None,
         num_residuals_per_layer: int = 2,
     ):
-        if isinstance(module, PrecondKDA) and next(module.parameters()).device.type != "meta":
+        if isinstance(module, ADAttention) and next(module.parameters()).device.type != "meta":
             a_log_lower = getattr(self.config, "a_log_init_lower", 0)
             with torch.no_grad():
-                # Initialize ATK gate parameters
-                if not getattr(module.A_log_atk, "_is_hf_initialized", False):
-                    module.A_log_atk.copy_(nn.init.uniform_(module.A_log_atk, a=a_log_lower, b=16).log())
-                module.A_log_atk._no_weight_decay = True
-                if not getattr(module.dt_bias_atk, "_is_hf_initialized", False):
-                    dt_atk = torch.exp(
-                        nn.init.uniform_(module.dt_bias_atk) * (math.log(0.1) - math.log(0.001)) + math.log(0.001),
-                    ).clamp(min=1e-4)
-                    inv_dt_atk = dt_atk + torch.log(-torch.expm1(-dt_atk))
-                    module.dt_bias_atk.copy_(inv_dt_atk)
-                module.dt_bias_atk._is_hf_initialized = True
-
                 # Initialize KDA gate parameters
-                if not getattr(module.A_log, "_is_hf_initialized", False):
-                    if module.safe_gate:
-                        module.A_log.zero_()
-                    else:
-                        module.A_log.copy_(nn.init.uniform_(module.A_log, a=a_log_lower, b=16).log())
-                module.A_log._no_weight_decay = True
-                if not getattr(module.dt_bias, "_is_hf_initialized", False):
-                    dt = torch.exp(
-                        nn.init.uniform_(module.dt_bias) * (math.log(0.1) - math.log(0.001)) + math.log(0.001),
-                    ).clamp(min=1e-4)
-                    inv_dt = dt + torch.log(-torch.expm1(-dt))
-                    module.dt_bias.copy_(inv_dt)
-                module.dt_bias._is_hf_initialized = True
+                if module.use_decay_gate:
+                    if getattr(self.config, 'restore_pkda_dt_init', False):
+                        devices = [module.dt_bias.device.index] if module.dt_bias.is_cuda else []
+                        with torch.random.fork_rng(devices=devices):
+                            dt = torch.exp(
+                                torch.rand_like(module.dt_bias)
+                                * (math.log(.1) - math.log(.001)) + math.log(.001)
+                            ).clamp_min(1e-4)
+                            module.dt_bias.copy_(dt + torch.log(-torch.expm1(-dt)))
+                    if not getattr(module.A_log, "_is_hf_initialized", False):
+                        if module.safe_gate:
+                            module.A_log.zero_()
+                        else:
+                            module.A_log.copy_(nn.init.uniform_(module.A_log, a=a_log_lower, b=16).log())
+                    module.A_log._no_weight_decay = True
+                    module.dt_bias._no_weight_decay = True
 
         if isinstance(module, (nn.Linear, nn.Conv1d)):
             # Slightly different from the TF version which uses truncated_normal for initialization
@@ -202,14 +196,14 @@ class PrecondKDAPreTrainedModel(PreTrainedModel):
                     raise ValueError(f"Invalid prenorm_residual_strategy: {prenorm_residual_strategy}")
 
 
-class PrecondKDAModel(PrecondKDAPreTrainedModel):
-    def __init__(self, config: PrecondKDAConfig):
+class ADAModel(ADAPreTrainedModel):
+    def __init__(self, config: ADAConfig):
         super().__init__(config)
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
 
         self.embeddings = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
-        self.layers = nn.ModuleList([PrecondKDABlock(config, layer_idx) for layer_idx in range(config.num_hidden_layers)])
+        self.layers = nn.ModuleList([ADABlock(config, layer_idx) for layer_idx in range(config.num_hidden_layers)])
         self.norm = (RMSNorm if config.fuse_norm else nn.RMSNorm)(config.hidden_size, eps=config.norm_eps)
 
         self.gradient_checkpointing = False
@@ -235,7 +229,7 @@ class PrecondKDAModel(PrecondKDAPreTrainedModel):
         **kwargs: Unpack[dict],
     ) -> tuple | BaseModelOutputWithPast:
         if output_attentions:
-            warnings.warn("`PrecondKDAModel` does not `output_attentions` now, setting it to `False`.")
+            warnings.warn("`ADAModel` does not `output_attentions` now, setting it to `False`.")
             output_attentions = False
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -289,12 +283,12 @@ class PrecondKDAModel(PrecondKDAPreTrainedModel):
         )
 
 
-class PrecondKDAForCausalLM(PrecondKDAPreTrainedModel, FLAGenerationMixin):
+class ADAForCausalLM(ADAPreTrainedModel, FLAGenerationMixin):
     _tied_weights_keys = ["lm_head.weight"]
 
     def __init__(self, config):
         super().__init__(config)
-        self.model = PrecondKDAModel(config)
+        self.model = ADAModel(config)
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
         self.criterion = None

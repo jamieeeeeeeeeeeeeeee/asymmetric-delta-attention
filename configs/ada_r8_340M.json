@@ -1,5 +1,5 @@
 {
-    "model_type": "precond_kda",
+    "model_type": "ada",
     "attn_mode": "chunk",
     "hidden_size": 1024,
     "num_heads": 8,
@@ -19,7 +19,11 @@
     "initializer_range": 0.02,
     "norm_eps": 1e-06,
     "allow_neg_eigval": false,
-    "squash_x": 1.5,
-    "squash_eps": 1e-06,
-    "log_atk_scale_init": -0.2
+    "beta_rank": 8,
+    "use_decay_gate": true,
+    "use_scalar_gate": false,
+    "use_output_gate": true,
+    "use_scalar_dt_bias": false,
+    "dt_init": "gdn",
+    "restore_pkda_dt_init": true
 }

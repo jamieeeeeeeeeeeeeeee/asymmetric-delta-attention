@@ -8,8 +8,8 @@
 from transformers.configuration_utils import PretrainedConfig
 
 
-class PrecondKDAConfig(PretrainedConfig):
-    model_type = 'precond_kda'
+class ADAConfig(PretrainedConfig):
+    model_type = 'ada'
     keys_to_ignore_at_inference = ['past_key_values']
 
     def __init__(
@@ -43,10 +43,13 @@ class PrecondKDAConfig(PretrainedConfig):
         fuse_cross_entropy: bool = True,
         use_l2warp: bool = False,
         vocab_size: int = 32000,
-        # Symmetric squash preconditioning
-        squash_x: float = 1.5,
-        squash_eps: float = 1e-6,
-        log_atk_scale_init: float = -0.2,
+        # ADA specific stuff (beta rank, which gates) 
+        beta_rank: int = -1,
+        use_decay_gate: bool = True,
+        use_scalar_gate: bool = False,
+        use_output_gate: bool = True,
+        use_scalar_dt_bias: bool = False,
+        dt_init: str = "gdn",
         **kwargs,
     ):
         self.attn_mode = attn_mode
@@ -76,11 +79,12 @@ class PrecondKDAConfig(PretrainedConfig):
         self.allow_neg_eigval = allow_neg_eigval
         self.safe_gate = safe_gate
         self.lower_bound = lower_bound
-
-        # Symmetric squash preconditioning
-        self.squash_x = squash_x
-        self.squash_eps = squash_eps
-        self.log_atk_scale_init = log_atk_scale_init
+        self.beta_rank = beta_rank
+        self.use_decay_gate = use_decay_gate
+        self.use_scalar_gate = use_scalar_gate
+        self.use_output_gate = use_output_gate
+        self.use_scalar_dt_bias = use_scalar_dt_bias
+        self.dt_init = dt_init
 
         if safe_gate and lower_bound is None:
             raise ValueError("`lower_bound` must be specified when `safe_gate=True` (recommended: -5).")
